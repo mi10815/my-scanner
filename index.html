@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>馬爾代夫集運簡易掃描器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; }
+        #reader { width: 100%; max-width: 500px; margin: auto; }
+        .controls { margin: 20px 0; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; }
+        .active { background-color: #4CAF50; color: white; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+    </style>
+</head>
+<body>
+    <h2>物流掃描助手 (MVP)</h2>
+    
+    <div id="reader"></div>
+
+    <div class="controls">
+        <button id="inBtn" class="active" onclick="setMode('入庫')">切換至：入庫</button>
+        <button id="outBtn" onclick="setMode('出庫')">切換至：出庫</button>
+    </div>
+
+    <button onclick="exportExcel()" style="background-color: #2196F3; color: white;">導出今日 Excel</button>
+    <button onclick="clearData()" style="background-color: #f44336; color: white;">清空紀錄</button>
+
+    <table id="logTable">
+        <thead>
+            <tr><th>時間</th><th>條碼單號</th><th>動作</th></tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+    </table>
+
+    <script>
+        let currentMode = '入庫';
+        let scanData = JSON.parse(localStorage.getItem('scanData') || '[]');
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('inBtn').className = mode === '入庫' ? 'active' : '';
+            document.getElementById('outBtn').className = mode === '出庫' ? 'active' : '';
+        }
+
+        // 初始化掃描器
+        const html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 150 } },
+            (decodedText) => {
+                saveRecord(decodedText);
+                // 震動回饋
+                if (navigator.vibrate) navigator.vibrate(100);
+            }
+        ).catch(err => console.error("掃描啟動失敗", err));
+
+        function saveRecord(barcode) {
+            const now = new Date();
+            const timeStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+            const record = { time: timeStr, barcode: barcode, type: currentMode };
+            
+            scanData.unshift(record); // 新紀錄在最前
+            localStorage.setItem('scanData', JSON.stringify(scanData));
+            updateTable();
+            
+            // 防止重複掃描，暫停1秒
+            html5QrCode.pause();
+            setTimeout(() => html5QrCode.resume(), 1500);
+        }
+
+        function updateTable() {
+            const body = document.getElementById('logBody');
+            body.innerHTML = scanData.map(r => `<tr><td>${r.time}</td><td>${r.barcode}</td><td>${r.type}</td></tr>`).join('');
+        }
+
+        function exportExcel() {
+            const worksheet = XLSX.utils.json_to_sheet(scanData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "掃描紀錄");
+            XLSX.writeFile(workbook, `集運清單_${new Date().toLocaleDateString()}.xlsx`);
+        }
+
+        function clearData() {
+            if(confirm("確定要刪除所有本地紀錄嗎？")) {
+                scanData = [];
+                localStorage.removeItem('scanData');
+                updateTable();
+            }
+        }
+
+        updateTable();
+    </script>
+</body>
+</html>
