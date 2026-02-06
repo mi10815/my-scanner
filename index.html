@@ -1,90 +1,119 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>馬爾代夫集運簡易掃描器</title>
+    <title>馬代集運助手 - 確認模式</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; }
-        #reader { width: 100%; max-width: 500px; margin: auto; }
-        .controls { margin: 20px 0; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; }
-        .active { background-color: #4CAF50; color: white; }
-        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
-        th, td { border: 1px solid #ddd; padding: 8px; }
+        body { font-family: -apple-system, sans-serif; text-align: center; padding: 15px; background: #f4f7f9; }
+        #reader { width: 100%; max-width: 450px; margin: 0 auto 15px; border-radius: 8px; overflow: hidden; }
+        .form-container { background: white; padding: 20px; border-radius: 12px; shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 450px; margin: auto; }
+        
+        input[type="text"] { width: 90%; padding: 12px; font-size: 18px; margin: 10px 0; border: 2px solid #ddd; border-radius: 6px; }
+        
+        .radio-group { display: flex; justify-content: space-around; margin: 15px 0; }
+        .radio-item { font-size: 18px; display: flex; align-items: center; }
+        .radio-item input { width: 20px; height: 20px; margin-right: 8px; }
+
+        .submit-btn { background: #4CAF50; color: white; width: 100%; padding: 15px; font-size: 18px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .submit-btn:active { background: #388E3C; }
+
+        .admin-btns { margin-top: 25px; display: flex; justify-content: center; gap: 10px; }
+        .secondary-btn { padding: 8px 15px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+        
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 14px; background: white; }
+        th, td { border: 1px solid #eee; padding: 10px; text-align: left; }
+        th { background: #f8f8f8; }
     </style>
 </head>
 <body>
-    <h2>物流掃描助手 (MVP)</h2>
+
+    <h2>📦 馬爾代夫集運系統</h2>
     
     <div id="reader"></div>
 
-    <div class="controls">
-        <button id="inBtn" class="active" onclick="setMode('入庫')">切換至：入庫</button>
-        <button id="outBtn" onclick="setMode('出庫')">切換至：出庫</button>
+    <div class="form-container">
+        <label>條碼單號：</label><br>
+        <input type="text" id="barcodeInput" placeholder="等待掃描或手動輸入...">
+        
+        <div class="radio-group">
+            <label class="radio-item">
+                <input type="radio" name="actionType" value="入庫" checked> 入庫
+            </label>
+            <label class="radio-item">
+                <input type="radio" name="actionType" value="出庫"> 出庫
+            </label>
+        </div>
+
+        <button class="submit-btn" onclick="submitRecord()">✅ 確認提交</button>
     </div>
 
-    <button onclick="exportExcel()" style="background-color: #2196F3; color: white;">導出今日 Excel</button>
-    <button onclick="clearData()" style="background-color: #f44336; color: white;">清空紀錄</button>
+    <div class="admin-btns">
+        <button class="secondary-btn" onclick="exportExcel()">匯出 Excel</button>
+        <button class="secondary-btn" onclick="clearData()" style="color:red;">清空紀錄</button>
+    </div>
 
     <table id="logTable">
         <thead>
-            <tr><th>時間</th><th>條碼單號</th><th>動作</th></tr>
+            <tr><th>時間</th><th>單號</th><th>動作</th></tr>
         </thead>
         <tbody id="logBody"></tbody>
     </table>
 
     <script>
-        let currentMode = '入庫';
         let scanData = JSON.parse(localStorage.getItem('scanData') || '[]');
-
-        function setMode(mode) {
-            currentMode = mode;
-            document.getElementById('inBtn').className = mode === '入庫' ? 'active' : '';
-            document.getElementById('outBtn').className = mode === '出庫' ? 'active' : '';
-        }
+        const barcodeInput = document.getElementById('barcodeInput');
 
         // 初始化掃描器
         const html5QrCode = new Html5Qrcode("reader");
         html5QrCode.start(
             { facingMode: "environment" }, 
-            { fps: 10, qrbox: { width: 250, height: 150 } },
+            { fps: 15, qrbox: { width: 250, height: 120 } },
             (decodedText) => {
-                saveRecord(decodedText);
-                // 震動回饋
-                if (navigator.vibrate) navigator.vibrate(100);
+                barcodeInput.value = decodedText; // 掃描成功後自動填入
+                if (navigator.vibrate) navigator.vibrate(50); // 震動提示
             }
-        ).catch(err => console.error("掃描啟動失敗", err));
+        ).catch(err => console.error("啟動失敗", err));
 
-        function saveRecord(barcode) {
+        // 提交紀錄到本地存儲
+        function submitRecord() {
+            const barcode = barcodeInput.value.trim();
+            if (!barcode) {
+                alert("請先掃描或輸入條碼！");
+                return;
+            }
+
+            const type = document.querySelector('input[name="actionType"]:checked').value;
             const now = new Date();
             const timeStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
-            const record = { time: timeStr, barcode: barcode, type: currentMode };
-            
-            scanData.unshift(record); // 新紀錄在最前
+
+            const record = { time: timeStr, barcode: barcode, type: type };
+            scanData.unshift(record); 
             localStorage.setItem('scanData', JSON.stringify(scanData));
+
             updateTable();
-            
-            // 防止重複掃描，暫停1秒
-            html5QrCode.pause();
-            setTimeout(() => html5QrCode.resume(), 1500);
+            barcodeInput.value = ''; // 清空輸入框
+            alert(type + " 成功：" + barcode);
         }
 
         function updateTable() {
             const body = document.getElementById('logBody');
-            body.innerHTML = scanData.map(r => `<tr><td>${r.time}</td><td>${r.barcode}</td><td>${r.type}</td></tr>`).join('');
+            body.innerHTML = scanData.slice(0, 10).map(r => `
+                <tr><td>${r.time}</td><td>${r.barcode}</td><td>${r.type}</td></tr>
+            `).join('');
         }
 
         function exportExcel() {
+            if(scanData.length === 0) return alert("目前沒有數據可以匯出");
             const worksheet = XLSX.utils.json_to_sheet(scanData);
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "掃描紀錄");
-            XLSX.writeFile(workbook, `集運清單_${new Date().toLocaleDateString()}.xlsx`);
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Logistics_Data");
+            XLSX.writeFile(workbook, `Maldives_Cargo_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
         function clearData() {
-            if(confirm("確定要刪除所有本地紀錄嗎？")) {
+            if(confirm("確定要刪除所有紀錄嗎？")) {
                 scanData = [];
                 localStorage.removeItem('scanData');
                 updateTable();
