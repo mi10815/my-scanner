@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>馬代集運助手 - 流暢版</title>
+    <title>馬代集運助手 - 數量加強版</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
@@ -10,26 +10,29 @@
         #reader { width: 100%; max-width: 450px; margin: 0 auto 15px; border-radius: 12px; overflow: hidden; background: #000; }
         .form-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 450px; margin: auto; }
         
-        input[type="text"] { width: 90%; padding: 15px; font-size: 20px; margin: 10px 0; border: 2px solid #eee; border-radius: 8px; outline: none; transition: border 0.3s; }
-        input[type="text"]:focus { border-color: #4CAF50; }
+        .input-label { text-align: left; display: block; margin-top: 10px; font-weight: bold; color: #555; }
+        input[type="text"], input[type="number"] { width: 90%; padding: 12px; font-size: 18px; margin: 8px 0; border: 2px solid #eee; border-radius: 8px; outline: none; }
+        
+        /* 數量調節器樣式 */
+        .qty-control { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 10px 0; }
+        .qty-btn { width: 45px; height: 45px; background: #eee; border: none; border-radius: 50%; font-size: 24px; cursor: pointer; }
         
         .radio-group { display: flex; justify-content: space-around; margin: 20px 0; }
-        .radio-item { font-size: 18px; display: flex; align-items: center; cursor: pointer; }
-        .radio-item input { width: 22px; height: 22px; margin-right: 10px; cursor: pointer; }
+        .radio-item { font-size: 18px; display: flex; align-items: center; }
+        .radio-item input { width: 22px; height: 22px; margin-right: 8px; }
 
         .submit-btn { background: #4CAF50; color: white; width: 100%; padding: 18px; font-size: 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #388E3C; }
         .submit-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #388E3C; }
 
-        /* 自動消失的提示框 (Toast) */
-        #toast { visibility: hidden; min-width: 200px; background-color: #333; color: #fff; text-align: center; border-radius: 30px; padding: 16px; position: fixed; z-index: 1000; left: 50%; bottom: 50px; transform: translateX(-50%); font-size: 16px; }
+        #toast { visibility: hidden; min-width: 200px; background-color: #333; color: #fff; text-align: center; border-radius: 30px; padding: 16px; position: fixed; z-index: 1000; left: 50%; bottom: 50px; transform: translateX(-50%); }
         #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 1.5s; }
 
         .admin-btns { margin-top: 30px; display: flex; justify-content: center; gap: 15px; }
-        .secondary-btn { padding: 10px 18px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: #fff; color: #666; }
+        .secondary-btn { padding: 10px 18px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: #fff; }
         
-        table { width: 100%; margin-top: 25px; border-collapse: collapse; font-size: 14px; background: white; border-radius: 8px; overflow: hidden; }
+        table { width: 100%; margin-top: 25px; border-collapse: collapse; font-size: 14px; background: white; }
         th, td { border: 1px solid #eee; padding: 12px; text-align: left; }
-        th { background: #f8f8f8; color: #888; }
+        th { background: #f8f8f8; }
 
         @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 50px; opacity: 1;} }
         @keyframes fadeout { from {bottom: 50px; opacity: 1;} to {bottom: 0; opacity: 0;} }
@@ -37,31 +40,39 @@
 </head>
 <body>
 
-    <h2 style="color: #2c3e50;">📦 馬爾代夫物流助手</h2>
+    <h2 style="color: #2c3e50;">📦 馬代物流助手 (數量版)</h2>
     
     <div id="reader"></div>
 
     <div class="form-container">
-        <input type="text" id="barcodeInput" placeholder="點擊這裡或掃描條碼">
+        <span class="input-label">單號：</span>
+        <input type="text" id="barcodeInput" placeholder="掃描或手動輸入">
         
+        <span class="input-label">數量：</span>
+        <div class="qty-control">
+            <button class="qty-btn" onclick="adjustQty(-1)">-</button>
+            <input type="number" id="qtyInput" value="1" style="width: 60px; text-align: center;">
+            <button class="qty-btn" onclick="adjustQty(1)">+</button>
+        </div>
+
         <div class="radio-group">
             <label class="radio-item"><input type="radio" name="actionType" value="入庫" checked> 入庫</label>
             <label class="radio-item"><input type="radio" name="actionType" value="出庫"> 出庫</label>
         </div>
 
-        <button class="submit-btn" onclick="submitRecord()">✅ 點擊確認提交</button>
+        <button class="submit-btn" onclick="submitRecord()">✅ 確認提交</button>
     </div>
 
-    <div id="toast">成功儲存紀錄</div>
+    <div id="toast">操作成功</div>
 
     <div class="admin-btns">
         <button class="secondary-btn" onclick="exportExcel()">匯出 Excel</button>
-        <button class="secondary-btn" onclick="clearData()" style="color:#e74c3c;">清空紀錄</button>
+        <button class="secondary-btn" onclick="clearData()" style="color:#e74c3c;">清空</button>
     </div>
 
     <table id="logTable">
         <thead>
-            <tr><th>時間</th><th>單號</th><th>類型</th></tr>
+            <tr><th>時間</th><th>單號</th><th>數量</th><th>類型</th></tr>
         </thead>
         <tbody id="logBody"></tbody>
     </table>
@@ -69,17 +80,18 @@
     <script>
         let scanData = JSON.parse(localStorage.getItem('scanData') || '[]');
         const barcodeInput = document.getElementById('barcodeInput');
+        const qtyInput = document.getElementById('qtyInput');
         const toast = document.getElementById('toast');
 
-        // 初始化掃描器
         const html5QrCode = new Html5Qrcode("reader");
-        const config = { fps: 20, qrbox: { width: 280, height: 150 } };
+        html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: { width: 280, height: 150 } }, (decodedText) => {
+            barcodeInput.value = decodedText;
+            if (navigator.vibrate) navigator.vibrate(50);
+        }).catch(err => console.error(err));
 
-        function startScanner() {
-            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
-                barcodeInput.value = decodedText;
-                if (navigator.vibrate) navigator.vibrate(50);
-            }).catch(err => console.error("掃描啟動失敗", err));
+        function adjustQty(val) {
+            let current = parseInt(qtyInput.value) || 1;
+            if (current + val >= 1) qtyInput.value = current + val;
         }
 
         function showToast(message, color = "#333") {
@@ -91,53 +103,46 @@
 
         function submitRecord() {
             const barcode = barcodeInput.value.trim();
-            if (!barcode) {
-                showToast("❌ 請先輸入單號", "#e74c3c");
-                return;
-            }
+            const qty = parseInt(qtyInput.value) || 1;
+            if (!barcode) return showToast("❌ 無單號", "#e74c3c");
 
             const type = document.querySelector('input[name="actionType"]:checked').value;
             const now = new Date();
-            const timeStr = now.getHours() + ":" + now.getMinutes().toString().padStart(2, '0') + ":" + now.getSeconds().toString().padStart(2, '0');
+            const timeStr = now.getHours() + ":" + now.getMinutes().toString().padStart(2, '0');
 
-            const record = { time: timeStr, barcode: barcode, type: type };
+            const record = { time: timeStr, barcode: barcode, qty: qty, type: type };
             scanData.unshift(record); 
             localStorage.setItem('scanData', JSON.stringify(scanData));
 
             updateTable();
-            barcodeInput.value = ''; 
-            
-            // 顯示自定義提示而非 Alert
-            showToast(`✅ ${type}成功: ${barcode.slice(-6)}`, "#4CAF50");
-
-            // 這裡關鍵：提交後不重新加載頁面，只是清空輸入框，相機依然在跑
+            barcodeInput.value = '';
+            qtyInput.value = '1'; // 提交後重置數量為1
+            showToast(`✅ ${type}成功 (${qty}件)`, "#4CAF50");
         }
 
         function updateTable() {
             const body = document.getElementById('logBody');
-            body.innerHTML = scanData.slice(0, 5).map(r => `
-                <tr><td>${r.time}</td><td>${r.barcode}</td><td>${r.type}</td></tr>
+            body.innerHTML = scanData.slice(0, 10).map(r => `
+                <tr><td>${r.time}</td><td>${r.barcode}</td><td>${r.qty}</td><td>${r.type}</td></tr>
             `).join('');
         }
 
         function exportExcel() {
-            if(scanData.length === 0) return showToast("暫無數據", "#e74c3c");
+            if(scanData.length === 0) return;
             const worksheet = XLSX.utils.json_to_sheet(scanData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Records");
-            XLSX.writeFile(workbook, `Logistics_${new Date().getMonth()+1}_${new Date().getDate()}.xlsx`);
+            XLSX.writeFile(workbook, `Maldives_Cargo_Log.xlsx`);
         }
 
         function clearData() {
-            if(confirm("確定清空所有數據？")) {
+            if(confirm("確定清空？")) {
                 scanData = [];
                 localStorage.removeItem('scanData');
                 updateTable();
             }
         }
 
-        // 啟動相機
-        startScanner();
         updateTable();
     </script>
 </body>
